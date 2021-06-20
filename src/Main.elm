@@ -44,7 +44,7 @@ stopsDecoder =
 getStops : Cmd Msg
 getStops =
     Http.get
-        { url = "https://drive.google.com/uc?export=download&id=1KWJVwjewmOHvkjn9pQt2TEh8e4tggY69"
+        { url = "http://data.pid.cz/stops/json/stops.json"
         , expect = Http.expectJson GetStops stopsDecoder
         }
 
