@@ -9,6 +9,8 @@ import Http
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as Pipeline
 import Types.Stop exposing (Stop, stopDecoder)
+import Types.Platform exposing (Platform)
+import Types.Line exposing (Line)
 
 
 main : Program () Model Msg
@@ -23,18 +25,19 @@ main =
 
 type Msg
     = NoOp
-    | GetStops (Result Http.Error (List String))
+    | GetStops (Result Http.Error (List Stop))
 
 
 type alias Model =
-    { stops : List String
+    { stops : List Stop
     , currentStop : String
     }
 
 
-stopsDecoder : Decode.Decoder (List String)
+stopsDecoder : Decode.Decoder (List Stop)
 stopsDecoder =
-    Decode.field "stopGroups" (Decode.list (Decode.field "name" Decode.string))
+    Decode.field "stopGroups" (Decode.list stopDecoder)
+    --Decode.field "stopGroups" (Decode.list (Decode.field "name" Decode.string))
 
 
 
@@ -77,28 +80,38 @@ subscriptions model =
     Sub.none
 
 
+
+rowItemLine : Line -> Html Msg
+rowItemLine line =
+    Html.div []
+        [ Html.text ("--- ---" ++ line.name)]
+
+rowItemPlatform : Platform -> Html Msg
+rowItemPlatform platform = 
+    Html.div []
+            [ Html.text ("---" ++ platform.name ++ " " ++ platform.zone)
+            , Html.div [] (List.map rowItemLine platform.lines) ]
+
 rowItem : Stop -> Html Msg
 rowItem stop =
     Html.div []
-        [ Html.text stop.uniqueName ]
+        [ Html.text (stop.uniqueName ++ " " ++ (Debug.toString stop.avgLat) ++ " " ++ (Debug.toString stop.avgLon)) 
+        , Html.div [] (List.map rowItemPlatform stop.platforms)]
 
 
-rowItem0 : List String -> Html Msg
+rowItem0 : List Stop -> Html Msg
 rowItem0 stops =
     Html.div []
         [ Html.text (Debug.toString (List.length stops)) ]
 
 
-rowItem1 : String -> Html Msg
-rowItem1 stop =
-    Html.div []
-        [ Html.text stop ]
 
 
 view : Model -> Html Msg
 view model =
+    Html.div [] (List.map rowItem model.stops)
     --(rowItem0 model.stops)
-    Html.div [] (List.map rowItem1 model.stops)
+    --Html.div [] (List.map rowItem1 model.stops)
 
 
 

@@ -1,10 +1,12 @@
 module Types.Line exposing (..)
 
+import Json.Decode as Decode exposing (Decoder)
+import Json.Decode.Pipeline as Pipeline
 
 type alias Line =
     { name : String
-    , lineType : LineType
-    , direction : String
+    --, lineType : LineType
+    --, direction : String
     }
 
 
@@ -16,3 +18,8 @@ type LineType
     | Bus
     | Ferry
     | Trolleybus
+
+lineDecoder : Decode.Decoder Line
+lineDecoder =
+    Decode.succeed Line
+        |> Pipeline.required "name" Decode.string
