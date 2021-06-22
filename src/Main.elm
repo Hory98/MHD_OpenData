@@ -1,7 +1,8 @@
 module Main exposing (main)
 
+import Bootstrap.Accordion as Accordion
 import Bootstrap.Button as Button
-import Bootstrap.Spinner as Spinner
+import Bootstrap.Card.Block as Block
 import Browser
 import Browser.Dom exposing (Element)
 import Element exposing (..)
@@ -33,6 +34,7 @@ type Msg
     = NoOp
     | GetStops (Result Http.Error (List Stop))
     | ChangedStopSearchBox (SearchBox.ChangeEvent Stop)
+    | AccordionMsg Accordion.State
 
 
 type Model
@@ -46,17 +48,13 @@ type alias DataModel =
     , stop : Maybe Stop
     , stopText : String
     , stopSearchBox : SearchBox.State
+    , accordionState : Accordion.State
     }
 
 
 stopsDecoder : Decode.Decoder (List Stop)
 stopsDecoder =
     Decode.field "stopGroups" (Decode.list stopDecoder)
-
-
-
---Decode.field "stopGroups" (Decode.list (Decode.field "name" Decode.string))
---(Decode.list stopDecoder)
 
 
 getStops : Cmd Msg
@@ -89,6 +87,7 @@ update msg model =
                             Nothing
                             ""
                             SearchBox.init
+                            Accordion.initialState
                         )
                     , Cmd.none
                     )
@@ -123,10 +122,25 @@ update msg model =
                 somethingElse ->
                     ( model, Cmd.none )
 
+        AccordionMsg state ->
+            case model of
+                Loaded dataModel ->
+                    ( Loaded { dataModel | accordionState = state }
+                    , Cmd.none
+                    )
+
+                somethingElse ->
+                    ( model, Cmd.none )
+
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.none
+    case model of
+        Loaded dataModel ->
+            Accordion.subscriptions dataModel.accordionState AccordionMsg
+
+        somethingElse ->
+            Sub.none
 
 
 rowItemLine : Line -> Html Msg
@@ -142,18 +156,43 @@ rowItemPlatform platform =
         , Html.div [] (List.map rowItemLine platform.lines)
         ]
 
+{--
+getPlatformsAccordion : List Platform -> List Accordion
+getPlatformsAccordion platforms =
+    []
+--}
 
-rowItem : Maybe Stop -> Html Msg
-rowItem stop =
-    case stop of
+stopView : DataModel -> Html Msg
+stopView dataModel =
+    let
+        stopMaybe = dataModel.stop
+    in
+    case stopMaybe of
         Nothing ->
             Html.div [] []
 
-        Just st ->
+        Just stop ->
             Html.div []
-                [ Html.text (st.uniqueName ++ " " ++ Debug.toString st.avgLat ++ " " ++ Debug.toString st.avgLon)
-                , Html.div [] (List.map rowItemPlatform st.platforms)
+                [ Html.text (stop.uniqueName ++ " " ++ Debug.toString stop.avgLat ++ " " ++ Debug.toString stop.avgLon)
+                , Html.div [] (List.map rowItemPlatform stop.platforms)
+                , Accordion.config AccordionMsg
+                    |> Accordion.withAnimation
+                    |> Accordion.cards
+                        [ Accordion.card
+                            { id = "card1"
+                            , options = []
+                            , header =
+                                Accordion.header [] <| Accordion.toggle [] [ Html.text "Card 1" ]
+                            , blocks =
+                                [ Accordion.block []
+                                    [ Block.text [] [ Html.text "Lorem ipsum etc" ] ]
+                                ]
+                            }
+                        ]
+                    |> Accordion.view dataModel.accordionState
                 ]
+
+
 
 
 rowItem0 : List Stop -> Html Msg
@@ -195,8 +234,7 @@ loadedView dataModel =
                     , state = dataModel.stopSearchBox
                     }
                 ]
-        , rowItem dataModel.stop
-        , Button.button [ Button.primary ] [ Html.text "Primary" ]
+        , stopView dataModel
         , rowItem0 (Maybe.withDefault [] dataModel.stops)
         ]
 
