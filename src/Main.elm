@@ -1,5 +1,7 @@
 module Main exposing (main)
 
+import Bootstrap.Button as Button
+import Bootstrap.Spinner as Spinner
 import Browser
 import Browser.Dom exposing (Element)
 import Element exposing (..)
@@ -33,7 +35,13 @@ type Msg
     | ChangedStopSearchBox (SearchBox.ChangeEvent Stop)
 
 
-type alias Model =
+type Model
+    = Loading
+    | Loaded DataModel
+    | Failed
+
+
+type alias DataModel =
     { stops : Maybe (List Stop)
     , stop : Maybe Stop
     , stopText : String
@@ -61,11 +69,7 @@ getStops =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { stops = Nothing
-      , stop = Nothing
-      , stopText = ""
-      , stopSearchBox = SearchBox.init
-      }
+    ( Loading
     , getStops
     )
 
@@ -79,35 +83,45 @@ update msg model =
         GetStops result ->
             case result of
                 Ok stops ->
-                    ( { model
-                        | stops = Just stops
-                      }
+                    ( Loaded
+                        (DataModel
+                            (Just stops)
+                            Nothing
+                            ""
+                            SearchBox.init
+                        )
                     , Cmd.none
                     )
 
                 Err _ ->
-                    ( model, Cmd.none )
+                    ( Failed, Cmd.none )
 
         ChangedStopSearchBox changeEvent ->
-            case changeEvent of
-                SearchBox.SelectionChanged stop ->
-                    ( { model | stop = Just stop }
-                    , Cmd.none
-                    )
+            case model of
+                Loaded dataModel ->
+                    case changeEvent of
+                        SearchBox.SelectionChanged stop ->
+                            ( Loaded { dataModel | stop = Just stop }
+                            , Cmd.none
+                            )
 
-                SearchBox.TextChanged text ->
-                    ( { model
-                        | stop = Nothing
-                        , stopText = text
-                        , stopSearchBox = SearchBox.reset model.stopSearchBox
-                      }
-                    , Cmd.none
-                    )
+                        SearchBox.TextChanged text ->
+                            ( Loaded
+                                { dataModel
+                                    | stop = Nothing
+                                    , stopText = text
+                                    , stopSearchBox = SearchBox.reset dataModel.stopSearchBox
+                                }
+                            , Cmd.none
+                            )
 
-                SearchBox.SearchBoxChanged subMsg ->
-                    ( { model | stopSearchBox = SearchBox.update subMsg model.stopSearchBox }
-                    , Cmd.none
-                    )
+                        SearchBox.SearchBoxChanged subMsg ->
+                            ( Loaded { dataModel | stopSearchBox = SearchBox.update subMsg dataModel.stopSearchBox }
+                            , Cmd.none
+                            )
+
+                somethingElse ->
+                    ( model, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg
@@ -132,8 +146,10 @@ rowItemPlatform platform =
 rowItem : Maybe Stop -> Html Msg
 rowItem stop =
     case stop of
-        Nothing -> Html.div [] []
-        Just st -> 
+        Nothing ->
+            Html.div [] []
+
+        Just st ->
             Html.div []
                 [ Html.text (st.uniqueName ++ " " ++ Debug.toString st.avgLat ++ " " ++ Debug.toString st.avgLon)
                 , Html.div [] (List.map rowItemPlatform st.platforms)
@@ -146,28 +162,57 @@ rowItem0 stops =
         [ Html.text (Debug.toString (List.length stops)) ]
 
 
-view : Model -> Html Msg
-view model =
-    Html.div [] [
-        Element.layout [] <|
+loadingView : Html Msg
+loadingView =
+    Html.div []
+        [ Html.img [ Attributes.src "../pictures/spinner.gif", Attributes.width 200, Attributes.height 200 ] []
+        ]
+
+
+failedView : Html Msg
+failedView =
+    Html.div []
+        [ Html.img [ Attributes.src "../pictures/no.png", Attributes.width 200, Attributes.height 200 ] [] ]
+
+
+loadedView : DataModel -> Html Msg
+loadedView dataModel =
+    Html.div []
+        [ Html.div [] [ Html.text "Icons: https://icons8.com/icon/set/transport/color" ]
+        , Element.layout [] <|
             column []
                 [ SearchBox.input []
                     { onChange = ChangedStopSearchBox
-                    , text = model.stopText
-                    , selected = model.stop
-                    , options = model.stops
+                    , text = dataModel.stopText
+                    , selected = dataModel.stop
+                    , options = dataModel.stops
                     , label = Input.labelAbove [] (text "Stop")
                     , placeholder = Nothing
                     , toLabel = \stop -> stop.uniqueName
                     , filter =
                         \query stop ->
                             String.contains (String.toLower query) (String.toLower stop.uniqueName)
-                    , state = model.stopSearchBox
+                    , state = dataModel.stopSearchBox
                     }
-                ],
-        --Html.h1 [] [ Html.text "Sunny Philadelphia" ]
-        rowItem model.stop
-    ]
+                ]
+        , rowItem dataModel.stop
+        , Button.button [ Button.primary ] [ Html.text "Primary" ]
+        , rowItem0 (Maybe.withDefault [] dataModel.stops)
+        ]
+
+
+view : Model -> Html Msg
+view model =
+    case model of
+        Loading ->
+            loadingView
+
+        Failed ->
+            failedView
+
+        Loaded dataModel ->
+            loadedView dataModel
+
 
 
 {--
@@ -191,9 +236,6 @@ Element.layout [] <|
 
 
 --}
-
-
-
 --Html.div [] (List.map rowItem (Maybe.withDefault [] model.stops))
 --(rowItem0 model.stops)
 --Html.div [] (List.map rowItem1 model.stops)

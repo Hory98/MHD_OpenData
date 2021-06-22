@@ -18,6 +18,7 @@ type LineType
     | Bus
     | Ferry
     | Trolleybus
+    | Unknown
 
 lineDecoder : Decode.Decoder Line
 lineDecoder =
