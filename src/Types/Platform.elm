@@ -13,7 +13,7 @@ type alias Platform =
     , lines : List Line
     }
 
-
+-- platform has (not) wheelcheir access or we do not know
 type WheelchairAccess
     = Possible
     | NotPossible
@@ -27,6 +27,7 @@ platformDecoder =
         (Decode.field "wheelchairAccess" wheelchairAccessDecoder)
         (Decode.field "lines" (Decode.list lineDecoder))
 
+-- decode wheelchair access from string to extra type
 wheelchairAccessDecoder : Decode.Decoder WheelchairAccess
 wheelchairAccessDecoder = 
         Decode.string
@@ -39,11 +40,3 @@ wheelchairAccessDecoder =
                 somethingElse ->
                     Decode.succeed Unknown
         )
-
-{--
-platformDecoder : Decode.Decoder Platform
-platformDecoder =
-    Decode.succeed Platform
-        |> Pipeline.required "id" Decode.string
-        |> Pipeline.required "zone" Decode.string
---}

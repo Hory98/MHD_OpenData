@@ -15,8 +15,8 @@ import Http
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as Pipeline
 import SearchBox
-import Types.Line exposing (Line)
-import Types.Platform exposing (Platform)
+import Types.Line exposing (Line, LineType)
+import Types.Platform exposing (Platform, WheelchairAccess)
 import Types.Stop exposing (Stop, stopDecoder)
 
 
@@ -30,11 +30,24 @@ main =
         }
 
 
+
+{--
+    GetStops - msg for downloading data
+    ChangedStopSearchBox - changes in searchBox
+--}
+
+
 type Msg
-    = NoOp
-    | GetStops (Result Http.Error (List Stop))
+    = GetStops (Result Http.Error (List Stop))
     | ChangedStopSearchBox (SearchBox.ChangeEvent Stop)
-    | AccordionMsg Accordion.State
+
+
+
+{--
+    Loading - initial state before data are loaded
+    Loaded - data are loaded
+    Failed - data loading failed
+--}
 
 
 type Model
@@ -48,13 +61,16 @@ type alias DataModel =
     , stop : Maybe Stop
     , stopText : String
     , stopSearchBox : SearchBox.State
-    , accordionState : Accordion.State
     }
 
 
 stopsDecoder : Decode.Decoder (List Stop)
 stopsDecoder =
     Decode.field "stopGroups" (Decode.list stopDecoder)
+
+
+
+-- download data of stops from opendata web
 
 
 getStops : Cmd Msg
@@ -75,9 +91,6 @@ init _ =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        NoOp ->
-            ( model, Cmd.none )
-
         GetStops result ->
             case result of
                 Ok stops ->
@@ -87,7 +100,6 @@ update msg model =
                             Nothing
                             ""
                             SearchBox.init
-                            Accordion.initialState
                         )
                     , Cmd.none
                     )
@@ -99,11 +111,13 @@ update msg model =
             case model of
                 Loaded dataModel ->
                     case changeEvent of
+                        -- change selected item
                         SearchBox.SelectionChanged stop ->
                             ( Loaded { dataModel | stop = Just stop }
                             , Cmd.none
                             )
 
+                        -- change text in searchBox
                         SearchBox.TextChanged text ->
                             ( Loaded
                                 { dataModel
@@ -114,6 +128,7 @@ update msg model =
                             , Cmd.none
                             )
 
+                        -- searchBox change
                         SearchBox.SearchBoxChanged subMsg ->
                             ( Loaded { dataModel | stopSearchBox = SearchBox.update subMsg dataModel.stopSearchBox }
                             , Cmd.none
@@ -122,50 +137,171 @@ update msg model =
                 somethingElse ->
                     ( model, Cmd.none )
 
-        AccordionMsg state ->
-            case model of
-                Loaded dataModel ->
-                    ( Loaded { dataModel | accordionState = state }
-                    , Cmd.none
-                    )
-
-                somethingElse ->
-                    ( model, Cmd.none )
-
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    case model of
-        Loaded dataModel ->
-            Accordion.subscriptions dataModel.accordionState AccordionMsg
+    Sub.none
+
+
+-- size of lineType image
+lineIconsSize : Int
+lineIconsSize =
+    80
+
+
+-- get picture for lineType with specified path
+lineTypeImage : String -> Html Msg
+lineTypeImage path =
+    Html.img
+        [ Attributes.src path
+        , Attributes.width lineIconsSize
+        , Attributes.height lineIconsSize
+        ]
+        []
+
+
+-- get picture for lineType with specified path
+lineTypeView : LineType -> Html Msg
+lineTypeView lineType =
+    case lineType of
+        Types.Line.Metro ->
+            lineTypeImage "pictures/metro.png"
+
+        Types.Line.Tram ->
+            lineTypeImage "pictures/tram.png"
+
+        Types.Line.Train ->
+            lineTypeImage "pictures/train.png"
+
+        Types.Line.Funicular ->
+            lineTypeImage "pictures/funicular.png"
+
+        Types.Line.Bus ->
+            lineTypeImage "pictures/bus.png"
+
+        Types.Line.Ferry ->
+            lineTypeImage "pictures/ferry.png"
+
+        Types.Line.Trolleybus ->
+            lineTypeImage "pictures/trolleybus.png"
 
         somethingElse ->
-            Sub.none
+            lineTypeImage "pictures/unknown.png"
 
 
-rowItemLine : Line -> Html Msg
-rowItemLine line =
-    Html.div []
-        [ Html.text ("--- ---" ++ line.name) ]
+-- picture for day/night line
+isNightView : Bool -> Html Msg
+isNightView isNight =
+    if isNight then
+        Html.img
+            [ Attributes.src "pictures/night.png"
+            , Attributes.width lineIconsSize
+            , Attributes.height lineIconsSize
+            ]
+            []
+
+    else
+        Html.img
+            [ Attributes.src "pictures/day.png"
+            , Attributes.width lineIconsSize
+            , Attributes.height lineIconsSize
+            ]
+            []
 
 
-rowItemPlatform : Platform -> Html Msg
-rowItemPlatform platform =
-    Html.div []
-        [ Html.text ("---" ++ platform.name ++ " " ++ platform.zone)
-        , Html.div [] (List.map rowItemLine platform.lines)
+-- HTML view of one line
+lineView : Line -> Html Msg
+lineView line =
+    Html.div [ Attributes.style "display" "flex", Attributes.style "font-size" "18px" ]
+        [ lineTypeView line.lineType
+        , isNightView line.isNight
+        , Html.ul []
+            [ Html.li [] [ Html.text ("Line name: " ++ line.name) ]
+            , Html.li [] [ Html.text ("Line direction: " ++ line.direction) ]
+            ]
         ]
 
-{--
-getPlatformsAccordion : List Platform -> List Accordion
-getPlatformsAccordion platforms =
-    []
---}
 
+-- image for wheelchair access
+wheelchairAccessImage : WheelchairAccess -> Html Msg
+wheelchairAccessImage wheelchairAccess =
+    case wheelchairAccess of
+        Types.Platform.Possible ->
+            Html.div [ Attributes.style "border-style" "solid" ]
+                [ Html.img
+                    [ Attributes.src "pictures/wheelchair.png"
+                    , Attributes.width lineIconsSize
+                    , Attributes.height lineIconsSize
+                    ]
+                    []
+                , Html.img
+                    [ Attributes.src "pictures/yes.png"
+                    , Attributes.width lineIconsSize
+                    , Attributes.height lineIconsSize
+                    ]
+                    []
+                ]
+
+        Types.Platform.NotPossible ->
+            Html.div [ Attributes.style "border-style" "solid" ]
+                [ Html.img
+                    [ Attributes.src "pictures/wheelchair.png"
+                    , Attributes.width lineIconsSize
+                    , Attributes.height lineIconsSize
+                    ]
+                    []
+                , Html.img
+                    [ Attributes.src "pictures/no.png"
+                    , Attributes.width lineIconsSize
+                    , Attributes.height lineIconsSize
+                    ]
+                    []
+                ]
+
+        somethingElse ->
+            Html.div [ Attributes.style "border-style" "solid" ]
+                [ Html.img
+                    [ Attributes.src "pictures/wheelchair.png"
+                    , Attributes.width lineIconsSize
+                    , Attributes.height lineIconsSize
+                    ]
+                    []
+                , Html.img
+                    [ Attributes.src "pictures/unknown.png"
+                    , Attributes.width lineIconsSize
+                    , Attributes.height lineIconsSize
+                    ]
+                    []
+                ]
+
+
+-- HTML view of one platform with N lines
+platformView : Platform -> Html Msg
+platformView platform =
+    Html.div []
+        [ Html.div [ Attributes.style "font-size" "20px", Attributes.style "background" "lightgrey" ]
+            [ Html.ul []
+                [ Html.li [] [ Html.text ("Platform name: " ++ platform.name) ]
+                , Html.li [] [ Html.text ("Platform zone(s): " ++ platform.zone) ]
+                ]
+            , wheelchairAccessImage platform.wheelchairAccess
+            ]
+        , Html.div [] (List.map lineView platform.lines)
+        ]
+
+
+-- build link to Google Maps from latitude, longitude and fixed zoom
+getGoogleMapsLink : Float -> Float -> String
+getGoogleMapsLink lat lon =
+    "https://www.google.cz/maps/@" ++ String.fromFloat lat ++ "," ++ String.fromFloat lon ++ ",18z"
+
+
+-- HTML view of one stop with N platforms
 stopView : DataModel -> Html Msg
 stopView dataModel =
     let
-        stopMaybe = dataModel.stop
+        stopMaybe =
+            dataModel.stop
     in
     case stopMaybe of
         Nothing ->
@@ -173,61 +309,45 @@ stopView dataModel =
 
         Just stop ->
             Html.div []
-                [ Html.text (stop.uniqueName ++ " " ++ Debug.toString stop.avgLat ++ " " ++ Debug.toString stop.avgLon)
-                , Html.div [] (List.map rowItemPlatform stop.platforms)
-                , Accordion.config AccordionMsg
-                    |> Accordion.withAnimation
-                    |> Accordion.cards
-                        [ Accordion.card
-                            { id = "card1"
-                            , options = []
-                            , header =
-                                Accordion.header [] <| Accordion.toggle [] [ Html.text "Card 1" ]
-                            , blocks =
-                                [ Accordion.block []
-                                    [ Block.text [] [ Html.text "Lorem ipsum etc" ] ]
-                                ]
-                            }
-                        ]
-                    |> Accordion.view dataModel.accordionState
+                [ Html.ul [ Attributes.style "font-size" "22px", Attributes.style "font-weight" "bold" ]
+                    [ Html.li [] [ Html.text ("Stop name: " ++ stop.uniqueName) ]
+                    , Html.li [] [ Html.text ("Municipality: " ++ stop.municipality) ]
+                    , Html.li [] [ Html.text ("Latitude: " ++ String.fromFloat stop.avgLat) ]
+                    , Html.li [] [ Html.text ("Longitude: " ++ String.fromFloat stop.avgLon) ]
+                    , Html.a [ Attributes.href (getGoogleMapsLink stop.avgLat stop.avgLon), Attributes.target "_blank" ] [ Html.text "Redirect to Google Maps" ]
+                    ]
+                , Html.div [] (List.map platformView stop.platforms)
                 ]
 
 
-
-
-rowItem0 : List Stop -> Html Msg
-rowItem0 stops =
-    Html.div []
-        [ Html.text (Debug.toString (List.length stops)) ]
-
-
+-- HTML view for Model Loading (state before loaded data)
 loadingView : Html Msg
 loadingView =
     Html.div []
-        [ Html.img [ Attributes.src "../pictures/spinner.gif", Attributes.width 200, Attributes.height 200 ] []
+        [ Html.img [ Attributes.src "pictures/spinner.gif", Attributes.width 200, Attributes.height 200 ] []
         ]
 
-
+-- HTML view for Model Failed (loading of data failed)
 failedView : Html Msg
 failedView =
     Html.div []
-        [ Html.img [ Attributes.src "../pictures/no.png", Attributes.width 200, Attributes.height 200 ] [] ]
+        [ Html.img [ Attributes.src "pictures/no.png", Attributes.width 200, Attributes.height 200 ] [] ]
 
-
+-- HTML view for Model Loaded (data are loaded in DataModel)
 loadedView : DataModel -> Html Msg
 loadedView dataModel =
     Html.div []
-        [ Html.div [] [ Html.text "Icons: https://icons8.com/icon/set/transport/color" ]
-        , Element.layout [] <|
+        [ --Html.div [] [ Html.text "Icons: https://icons8.com/icon/set/transport/color" ] https://opendata.gov.cz/%C5%A1patn%C3%A1-praxe:chyb%C4%9Bj%C3%ADc%C3%AD-cors
+          Element.layout [] <|
             column []
                 [ SearchBox.input []
                     { onChange = ChangedStopSearchBox
                     , text = dataModel.stopText
                     , selected = dataModel.stop
                     , options = dataModel.stops
-                    , label = Input.labelAbove [] (text "Stop")
+                    , label = Input.labelAbove [] (text "Search and choose stop")
                     , placeholder = Nothing
-                    , toLabel = \stop -> stop.uniqueName
+                    , toLabel = \stop -> stop.uniqueName ++ " (" ++ String.fromInt stop.id ++ ")"
                     , filter =
                         \query stop ->
                             String.contains (String.toLower query) (String.toLower stop.uniqueName)
@@ -235,10 +355,9 @@ loadedView dataModel =
                     }
                 ]
         , stopView dataModel
-        , rowItem0 (Maybe.withDefault [] dataModel.stops)
         ]
 
-
+-- main view function, just switch for 3 models
 view : Model -> Html Msg
 view model =
     case model of
@@ -250,31 +369,3 @@ view model =
 
         Loaded dataModel ->
             loadedView dataModel
-
-
-
-{--
-
-Element.layout [] <|
-        column []
-            [ SearchBox.input []
-                { onChange = ChangedStopSearchBox
-                , text = model.stopText
-                , selected = model.stop
-                , options = model.stops
-                , label = Input.labelAbove [] (text "Stop")
-                , placeholder = Nothing
-                , toLabel = \stop -> stop.uniqueName
-                , filter =
-                    \query stop ->
-                        String.contains (String.toLower query) (String.toLower stop.uniqueName)
-                , state = model.stopSearchBox
-                }
-            ]
-
-
---}
---Html.div [] (List.map rowItem (Maybe.withDefault [] model.stops))
---(rowItem0 model.stops)
---Html.div [] (List.map rowItem1 model.stops)
---Html.div [] (List.map rowItem model.stops)
