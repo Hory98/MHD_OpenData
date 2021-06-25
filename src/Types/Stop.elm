@@ -25,5 +25,10 @@ stopDecoder =
         (Decode.field "avgLon" Decode.float)
         (Decode.field "municipality" Decode.string)
         (Decode.field "stops" (Decode.list platformDecoder))
+
+
+stopsDecoder : Decode.Decoder (List Stop)
+stopsDecoder =
+    Decode.field "stopGroups" (Decode.list stopDecoder)
        
 

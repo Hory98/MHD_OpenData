@@ -17,7 +17,7 @@ import Json.Decode.Pipeline as Pipeline
 import SearchBox
 import Types.Line exposing (Line, LineType)
 import Types.Platform exposing (Platform, WheelchairAccess)
-import Types.Stop exposing (Stop, stopDecoder)
+import Types.Stop exposing (Stop, stopDecoder, stopsDecoder)
 
 
 main : Program () Model Msg
@@ -48,8 +48,6 @@ type Msg
     Loaded - data are loaded
     Failed - data loading failed
 --}
-
-
 type Model
     = Loading
     | Loaded DataModel
@@ -63,21 +61,12 @@ type alias DataModel =
     , stopSearchBox : SearchBox.State
     }
 
-
-stopsDecoder : Decode.Decoder (List Stop)
-stopsDecoder =
-    Decode.field "stopGroups" (Decode.list stopDecoder)
-
-
-
 -- download data of stops from opendata web
-
-
 getStops : Cmd Msg
 getStops =
     Http.get
         { url = "http://data.pid.cz/stops/json/stops.json"
-        , expect = Http.expectJson GetStops stopsDecoder
+        , expect = Http.expectJson GetStops Types.Stop.stopsDecoder
         }
 
 
@@ -337,7 +326,7 @@ failedView =
 loadedView : DataModel -> Html Msg
 loadedView dataModel =
     Html.div []
-        [ --Html.div [] [ Html.text "Icons: https://icons8.com/icon/set/transport/color" ] https://opendata.gov.cz/%C5%A1patn%C3%A1-praxe:chyb%C4%9Bj%C3%ADc%C3%AD-cors
+        [
           Element.layout [] <|
             column []
                 [ SearchBox.input []
